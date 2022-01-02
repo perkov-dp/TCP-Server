@@ -112,11 +112,13 @@ void Server::Listen(int sockfd, size_t listen_queue_size) {
  */
 int Server::Accept(struct sockaddr_in& client_addr) {
 	socklen_t size = sizeof(client_addr);
-	int res = accept(listenFd, (struct sockaddr*)&client_addr, &size);
-	if (res == -1) {
+	int client_fd = accept(listenFd, (struct sockaddr*)&client_addr, &size);
+	if (client_fd == -1 && errno != EINTR) {
 		perror("SERVER Accept() failed");
+		exit(EXIT_FAILURE);
 	}
-	return res;
+
+	return client_fd;
 }
 
 /**
