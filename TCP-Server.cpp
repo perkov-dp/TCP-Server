@@ -24,9 +24,10 @@ int main(int argc, char *argv[]) {
 		ticks = time(NULL);
 		bzero(buff, 0);
 		//	проверяет переполнение буфера
-		snprintf(buff, sizeof(buff), "%.24s\er\en", ctime(&ticks));
+		snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
 		string str = buff;
-		server.Write(connfd, str);
+		server.Writen(connfd, str.c_str(), str.size());
+		cout << str << endl;
 
 		//	Закрываем соединение с клиентом
 		server.Close(connfd);
