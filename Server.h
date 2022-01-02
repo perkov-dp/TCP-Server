@@ -9,6 +9,7 @@ using namespace std;
 #include <unistd.h>	//	read
 #include <netinet/in.h>	//	sockaddr_in
 #include <sys/socket.h>	//	socket
+#include <arpa/inet.h>	//	inet_ntop
 #include <errno.h>
 
 /**
@@ -20,7 +21,8 @@ const size_t LISTENQ = 1024;
 class Server {
 public:
 	Server(uint16_t port_number);
-	int Accept();
+	int Accept(struct sockaddr_in& client_addr);
+	pair<string, uint16_t> GetClientId(const struct sockaddr_in &client);
 	void Close(int connfd);
 
 	ssize_t Readn(void *vptr, size_t n);

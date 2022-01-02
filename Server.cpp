@@ -76,7 +76,8 @@ sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t p
 }
 
 /**
- * Связывание заранее известного порта сервера с сокетом
+ * Связывание заранее сокет c IP-адресом.
+ * Для вызова bind н/обладать правами суперпользователя!!!
  */
 void Server::Bind(int sockfd, const struct sockaddr_in& servaddr) {
 	if ((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) == -1) {
@@ -106,14 +107,29 @@ void Server::Listen(int sockfd, size_t listen_queue_size) {
  * который называется присоединенным дескриптором.
  * Этот дескриптор исп-ся для связи с новым клиентом и возвращается для каждого клиента,
  * соединяющегося с нашим сервером.
+ *
+ * Аргументы servaddr и size исп-ся для идентификации клиента (адрес протокола клиента)
  */
-int Server::Accept() {
-	socklen_t size = sizeof(servaddr);
-	int res = accept(listenFd, (struct sockaddr*)&servaddr, &size);
+int Server::Accept(struct sockaddr_in& client_addr) {
+	socklen_t size = sizeof(client_addr);
+	int res = accept(listenFd, (struct sockaddr*)&client_addr, &size);
 	if (res == -1) {
 		perror("SERVER Accept() failed");
 	}
 	return res;
+}
+
+/**
+ * Определение адреса и порта клиента
+ */
+pair<string, uint16_t> Server::GetClientId(const struct sockaddr_in &client) {
+	pair <string, int> p;
+	char client_addr[INET_ADDRSTRLEN];	//	адрес клиента. То же самое, что и возвращаемое значение. Не исп-ся!
+	//	преобразуем 32-битовый адрес в строку
+	p.first = inet_ntop(client.sin_family, &client.sin_addr, client_addr, sizeof(client_addr));
+	p.second = ntohs(client.sin_port);	//	преобразование сетевого порядка байтов в порядок байт узла
+
+	return p;
 }
 
 /**

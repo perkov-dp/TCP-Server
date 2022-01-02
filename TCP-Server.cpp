@@ -8,6 +8,7 @@ using namespace std;
 
 int main(int argc, char *argv[]) {
 	int connfd;
+	struct sockaddr_in client_addr;
 	char buff[128];
 	time_t ticks;
 	const uint16_t PORT_NUMBER = 34543;	//	сервер даты и времени
@@ -19,7 +20,9 @@ int main(int argc, char *argv[]) {
 	 */
 	for(;;) {
 		//	Соединение с клиентом
-		connfd = server.Accept();
+		connfd = server.Accept(client_addr);
+		pair <string, int> p = server.GetClientId(client_addr);
+		cout << "new client connected from <" << p.first << ", " << p.second << ">" << endl;
 
 		ticks = time(NULL);
 		bzero(buff, 0);
@@ -27,7 +30,6 @@ int main(int argc, char *argv[]) {
 		snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
 		string str = buff;
 		server.Writen(connfd, str.c_str(), str.size());
-		cout << str << endl;
 
 		//	Закрываем соединение с клиентом
 		server.Close(connfd);
