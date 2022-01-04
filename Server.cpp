@@ -177,7 +177,7 @@ ssize_t Server::readn(int fd, void *vptr, size_t n) {
 	return(n - nleft);		/* return >= 0 */
 }
 
-ssize_t Server::Readn(void *ptr, size_t nbytes) {
+ssize_t Server::Readn(int listenFd, void *ptr, size_t nbytes) {
 	ssize_t	n;
 	if ((n = readn(listenFd, ptr, nbytes)) < 0) {
 		perror("readn error");
@@ -215,4 +215,34 @@ void Server::Writen(int fd, const void *ptr, size_t nbytes) {
 	if (writen(fd, ptr, nbytes) != static_cast<int>(nbytes)) {
 		perror("writen error");
 	}
+}
+
+/**
+ * Ф-я отправки эха-сообщения клиенту
+ */
+int Server::str_echo(int clientfd) {
+	ssize_t		n;
+	char		buf[256];
+
+	int result = -1;
+
+	//	пока есть данные, отсылаем их клиенту
+	if ((n = Readn(clientfd, buf, sizeof(buf))) > 0) {
+		Writen(clientfd, buf, sizeof(buf));
+	}
+	//	???? -> заново пробуем читать
+	if (n < 0 && errno == EINTR) {
+		str_echo(clientfd);
+	}
+	//	клиент разорвал соединение
+	else if (n == 0) {
+		cout << "str_echo: client close session" << endl;
+		result = 0;
+	}
+	else if (n < 0) {
+		perror("str_echo: read error");
+		result = -1;
+	}
+
+	return result;
 }

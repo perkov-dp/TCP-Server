@@ -27,8 +27,9 @@ public:
 	pair<string, uint16_t> GetClientId(const struct sockaddr_in &client);
 	void Close(int connfd);
 
-	ssize_t Readn(void *vptr, size_t n);
+	ssize_t Readn(int listenFd, void *vptr, size_t n);
 	void Writen(int connfd, const void *vptr, size_t n);
+	int str_echo(int clientfd);
 
 	int GetListenFd() {
 		return listenFd;

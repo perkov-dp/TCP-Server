@@ -28,15 +28,12 @@ int main(int argc, char *argv[]) {
 		//	запускается дочерний процесс
 		if ((childpid = fork()) == 0) {
 			server.Close(server.GetListenFd());	//	дочерний пр-сс закрывает прослушивамый сокет сервера
-			//str_echo(connfd);	// process the request
-			/**/
-			ticks = time(NULL);
-			bzero(buff, 0);
-			//	проверяет переполнение буфера
-			snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
-			string str = buff;
-			server.Writen(connfd, str.c_str(), str.size());
-			/**/
+
+			/**
+			 * Выполняем требуемые д-я.
+			 * В данном случае отвечаем зеркалировнием на запрос клиента.
+			 */
+			server.str_echo(connfd);	// process the request
 
 			cout << "Cliend disconnected!" << endl;
 			exit(0);	//	завершение дочернего процесса с закрытием всех его дескрипторов
