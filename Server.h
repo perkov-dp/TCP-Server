@@ -11,6 +11,8 @@ using namespace std;
 #include <sys/socket.h>	//	socket
 #include <arpa/inet.h>	//	inet_ntop
 #include <errno.h>
+#include <stdlib.h>		//	exit
+#include <process.h>	//	fork
 
 /**
  * Макс кол-во клиентских соед-ий, к-рые ядро
@@ -27,6 +29,10 @@ public:
 
 	ssize_t Readn(void *vptr, size_t n);
 	void Writen(int connfd, const void *vptr, size_t n);
+
+	int GetListenFd() {
+		return listenFd;
+	}
 private:
 	int Socket(int family, int socket_type);
 	sockaddr_in InitSockaddrStruct(int family, uint32_t hostlong, uint16_t port_number);

@@ -7,6 +7,7 @@ using namespace std;
 #include "Server.h"
 
 int main(int argc, char *argv[]) {
+	pid_t childpid;
 	int connfd;
 	struct sockaddr_in client_addr;
 	char buff[128];
@@ -24,12 +25,25 @@ int main(int argc, char *argv[]) {
 		pair <string, int> p = server.GetClientId(client_addr);
 		cout << "new client connected from <" << p.first << ", " << p.second << ">" << endl;
 
-		ticks = time(NULL);
-		bzero(buff, 0);
-		//	проверяет переполнение буфера
-		snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
-		string str = buff;
-		server.Writen(connfd, str.c_str(), str.size());
+		//	запускается дочерний процесс
+		if ((childpid = fork()) == 0) {
+			server.Close(server.GetListenFd());	//	дочерний пр-сс закрывает прослушивамый сокет сервера
+			//str_echo(connfd);	// process the request
+			/**/
+			ticks = time(NULL);
+			bzero(buff, 0);
+			//	проверяет переполнение буфера
+			snprintf(buff, sizeof(buff), "%.24s", ctime(&ticks));
+			string str = buff;
+			server.Writen(connfd, str.c_str(), str.size());
+			/**/
+
+			cout << "Cliend disconnected!" << endl;
+			exit(0);	//	завершение дочернего процесса с закрытием всех его дескрипторов
+		} else if (childpid == -1) {
+			perror("Fork error");
+			return EXIT_FAILURE;
+		}
 
 		//	Закрываем соединение с клиентом
 		server.Close(connfd);
