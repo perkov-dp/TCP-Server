@@ -10,8 +10,6 @@ int main(int argc, char *argv[]) {
 	pid_t childpid;
 	int connfd;
 	struct sockaddr_in client_addr;
-	char buff[128];
-	time_t ticks;
 	const uint16_t PORT_NUMBER = 34543;	//	сервер даты и времени
 	Server server(PORT_NUMBER);
 
@@ -33,7 +31,12 @@ int main(int argc, char *argv[]) {
 			 * Выполняем требуемые д-я.
 			 * В данном случае отвечаем зеркалировнием на запрос клиента.
 			 */
-			server.str_echo(connfd);	// process the request
+			char buf[128];
+			int n = server.Readn(connfd, buf, 15);
+			cout << "Read: " << buf << endl;
+			server.Writen(connfd, buf, n-1);
+			cout << "Write: " << buf << endl;
+			//server.str_echo(connfd);	// process the request
 
 			cout << "Cliend disconnected!" << endl;
 			exit(0);	//	завершение дочернего процесса с закрытием всех его дескрипторов

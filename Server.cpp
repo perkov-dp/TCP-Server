@@ -161,14 +161,22 @@ ssize_t Server::readn(int fd, void *vptr, size_t n) {
 	ptr = (char*)vptr;
 	nleft = n;
 	while (nleft > 0) {
-		if ( (nread = read(fd, ptr, nleft)) < 0) {
+		nread = read(fd, ptr, nleft);
+		if (nread < 0) {
 			if (errno == EINTR) {
 				/* and call read() again */
 				continue;
+			} else {
+				return(-1);
 			}
-			return(-1);
 		} else if (nread == 0) {
 			break;	/* EOF */
+		}
+		else {
+			if (ptr[nread - 1] == '\n') {
+				nleft -= nread;	//	количество читаемых байт уменьшается на кол-во прочитанных байт
+				break;	/* EOF */
+			}
 		}
 
 		nleft -= nread;	//	количество читаемых байт уменьшается на кол-во прочитанных байт
@@ -229,6 +237,7 @@ int Server::str_echo(int clientfd) {
 	//	пока есть данные, отсылаем их клиенту
 	if ((n = Readn(clientfd, buf, sizeof(buf))) > 0) {
 		Writen(clientfd, buf, sizeof(buf));
+		cout << buf << endl;
 	}
 	//	???? -> заново пробуем читать
 	if (n < 0 && errno == EINTR) {
