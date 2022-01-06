@@ -117,6 +117,10 @@ int Server::Accept(struct sockaddr_in& client_addr) {
 		perror("SERVER Accept() failed");
 		exit(EXIT_FAILURE);
 	}
+	//	Во время вып-я Accept пришел сигнал и прервал ее выполнение -> перезапускаем Accept
+	else if (errno == EINTR) {
+		return -1;
+	}
 
 	return client_fd;
 }
@@ -228,30 +232,27 @@ void Server::Writen(int fd, const void *ptr, size_t nbytes) {
 /**
  * Ф-я отправки эха-сообщения клиенту
  */
-int Server::str_echo(int clientfd) {
-	ssize_t		n;
-	char		buf[256];
+void Server::str_echo(int clientfd) {
+	char buf[128];
+	int n = Readn(clientfd, buf, sizeof(buf));
+	//cout << "Read: " << buf << endl;
+	Writen(clientfd, buf, n-1);
+	//cout << "Write: " << buf << endl;
+}
 
-	int result = -1;
-
-	//	пока есть данные, отсылаем их клиенту
-	if ((n = Readn(clientfd, buf, sizeof(buf))) > 0) {
-		Writen(clientfd, buf, sizeof(buf));
-		cout << buf << endl;
-	}
-	//	???? -> заново пробуем читать
-	if (n < 0 && errno == EINTR) {
-		str_echo(clientfd);
-	}
-	//	клиент разорвал соединение
-	else if (n == 0) {
-		cout << "str_echo: client close session" << endl;
-		result = 0;
-	}
-	else if (n < 0) {
-		perror("str_echo: read error");
-		result = -1;
-	}
-
-	return result;
+/**
+ * Обертка для ф-ции sigaction.
+ * Первый арг-т - имя сигнала.
+ * Второй арг0т ф-я обработчик этого сигнала.
+ */
+void Server::SignalInit(int signo, void (*signal_handler)(int)) {
+    struct sigaction action;
+    action.sa_handler = signal_handler;
+    //	установка маски обработчика сигнала. Во время работы обработчика дополнительные сигналы не блокируются
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(signo, &action, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
 }

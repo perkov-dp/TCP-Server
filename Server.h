@@ -29,11 +29,13 @@ public:
 
 	ssize_t Readn(int listenFd, void *vptr, size_t n);
 	void Writen(int connfd, const void *vptr, size_t n);
-	int str_echo(int clientfd);
+	void str_echo(int clientfd);
 
 	int GetListenFd() {
 		return listenFd;
 	}
+
+	void SignalInit(int signo, void (*signal_handler)(int));
 private:
 	int Socket(int family, int socket_type);
 	sockaddr_in InitSockaddrStruct(int family, uint32_t hostlong, uint16_t port_number);
