@@ -23,6 +23,9 @@ const size_t LISTENQ = 1024;
 class Server {
 public:
 	Server(uint16_t port_number);
+	~Server() {
+		Close(listenFd);
+	}
 	int Accept(struct sockaddr_in& client_addr);
 	pair<string, uint16_t> GetClientId(const struct sockaddr_in &client);
 	void Close(int connfd);
