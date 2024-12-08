@@ -1,3 +1,6 @@
+#include <cstring>
+#include <signal.h>
+
 #include "Server.h"
 
 /**
@@ -31,6 +34,10 @@ Server::Server(uint16_t port_number) {
 	 * ставит в очередь на прослушиваемом сокете.
 	 */
 	Listen(listenFd, LISTENQ);
+}
+
+Server::~Server() {
+	Close(listenFd);
 }
 
 
@@ -128,20 +135,20 @@ int Server::Accept(struct sockaddr_in& client_addr) {
 /**
  * Определение адреса и порта клиента
  */
-pair<string, uint16_t> Server::GetClientId(const struct sockaddr_in &client) {
-	pair <string, int> p;
+std::pair<std::string, uint16_t> Server::GetClientId(const struct sockaddr_in& client) {
+	std::pair<std::string, int> res;
 	char client_addr[INET_ADDRSTRLEN];	//	адрес клиента. То же самое, что и возвращаемое значение. Не исп-ся!
 	//	преобразуем 32-битовый адрес в строку
-	p.first = inet_ntop(client.sin_family, &client.sin_addr, client_addr, sizeof(client_addr));
-	p.second = ntohs(client.sin_port);	//	преобразование сетевого порядка байтов в порядок байт узла
+	res.first = inet_ntop(client.sin_family, &client.sin_addr, client_addr, sizeof(client_addr));
+	res.second = ntohs(client.sin_port);	//	преобразование сетевого порядка байтов в порядок байт узла
 
-	return p;
+	return res;
 }
 
 /**
  * Передача клиенту ответа от Сервера
  */
-void Write(int connfd, const string& write_string) {
+void Write(int connfd, const std::string& write_string) {
 	write(connfd, write_string.c_str(), write_string.size());
 }
 
