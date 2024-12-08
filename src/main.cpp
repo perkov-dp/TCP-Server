@@ -1,9 +1,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
-using namespace std;
-
+#include <signal.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include "Server.h"
 
 /**
@@ -23,7 +25,7 @@ void SigChild(int signo) {
 	//	3-й пар-р сообщает ядру, что не нужно вып-ть блокирование, если нет завершенных дочерних пр-ссов
 	//	Ф-я waitpid с флагом WNOHANG ставит сигналы в очередь и обрабатывает их по порядку.
 	while ((pid = waitpid(-1, &stat, WNOHANG)) > 0) {
-		printf("child %d terminated\n", pid);
+		std::cout << "child " << pid << " terminated" << std::endl;
 	}
 	return;
 }
@@ -47,8 +49,8 @@ int main(int argc, char *argv[]) {
 		if (connfd == -1) {
 			continue;
 		}
-		pair <string, int> p = server.GetClientId(client_addr);
-		cout << "new client connected from <" << p.first << ", " << p.second << ">" << endl;
+		std::pair<std::string, int> p = server.GetClientId(client_addr);
+		std::cout << "new client connected from <" << p.first << ", " << p.second << ">" << std::endl;
 
 		//	запускается дочерний процесс
 		if ((childpid = fork()) == 0) {
@@ -60,7 +62,7 @@ int main(int argc, char *argv[]) {
 			 */
 			server.str_echo(connfd);	// process the request
 
-			cout << "Client from <" << p.first << ", " << p.second << ">" << " disconnected!" << endl;
+			std::cout << "Client from <" << p.first << ", " << p.second << ">" << " disconnected!" << std::endl;
 			exit(0);	//	завершение дочернего процесса с закрытием всех его дескрипторов
 		} else if (childpid == -1) {
 			perror("Fork error");
@@ -71,6 +73,5 @@ int main(int argc, char *argv[]) {
 		server.Close(connfd);
 	}
 
-	std::cout << "Welcome to the QNX Momentics IDE" << std::endl;
 	return EXIT_SUCCESS;
 }

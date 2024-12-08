@@ -3,7 +3,6 @@
 #include <iostream>
 #include <string>
 #include <utility>
-using namespace std;
 
 #include <sys/types.h>
 #include <unistd.h>	//	read
@@ -12,22 +11,19 @@ using namespace std;
 #include <arpa/inet.h>	//	inet_ntop
 #include <errno.h>
 #include <stdlib.h>		//	exit
-#include <process.h>	//	fork
 
 /**
  * Макс кол-во клиентских соед-ий, к-рые ядро
  * ставит в очередь на прослушиваемом сокете.
  */
-const size_t LISTENQ = 1024;
+constexpr size_t LISTENQ = 1024;
 
 class Server {
 public:
 	Server(uint16_t port_number);
-	~Server() {
-		Close(listenFd);
-	}
+	virtual ~Server();
 	int Accept(struct sockaddr_in& client_addr);
-	pair<string, uint16_t> GetClientId(const struct sockaddr_in &client);
+	std::pair<std::string, uint16_t> GetClientId(const struct sockaddr_in &client);
 	void Close(int connfd);
 
 	ssize_t Readn(int listenFd, void *vptr, size_t n);
