@@ -1,3 +1,6 @@
+#include <cstring>
+#include <signal.h>
+
 #include "Server.h"
 
 /**
@@ -7,22 +10,21 @@
  * - bind
  * - listen
  */
-Server::Server(uint16_t port_number) {
+Server::Server(SocketType socketType, uint16_t portNumber) {
 	/**
-	 * Создание сокета TCP.
+	 * Создание сокета 'SocketType'.
 	 * Ф-я Socket возвращает дискриптор, к-рый идентифицирует сокет
 	 * в последующих вызовах (connect, read)
 	 */
-	const int SOCKET_TYPE = SOCK_STREAM;	//	потоковый сокет
 	const int PROTOCOL_FAMILY = AF_INET;	//	семейство протоколов IPv4
-	listenFd = Socket(PROTOCOL_FAMILY, SOCKET_TYPE);
+	m_listenFd = Socket(PROTOCOL_FAMILY, socketType);
 
 	/**
 	 * Связывание заранее известного порта сервера с сокетом
 	 */
-	const uint32_t IP_ADDRESS = INADDR_ANY;	//	прием запроса с любого адреса
-	servaddr = InitSockaddrStruct(PROTOCOL_FAMILY, IP_ADDRESS, port_number);
-	Bind(listenFd, servaddr);
+	constexpr uint32_t IP_ADDRESS = INADDR_ANY;	//	прием запроса с любого адреса
+	m_servaddr = InitSockaddrStruct(PROTOCOL_FAMILY, IP_ADDRESS, portNumber);
+	Bind(m_listenFd, m_servaddr);
 
 	/**
 	 * Преобразование сокета в прослушиваемый сокет, т.е. такой,
@@ -30,7 +32,11 @@ Server::Server(uint16_t port_number) {
 	 * Второй пар-р задает макс кол-во клиентских соед-ий, к-рые ядро
 	 * ставит в очередь на прослушиваемом сокете.
 	 */
-	Listen(listenFd, LISTENQ);
+	Listen(m_listenFd, LISTENQ);
+}
+
+Server::~Server() {
+	Close(m_listenFd);
 }
 
 
@@ -45,10 +51,10 @@ Server::Server(uint16_t port_number) {
  * Все вместе - это название TCP-сокета
  * Возвращает дескриптор сокета
  */
-int Server::Socket(int family, int type) {
+int Server::Socket(int family, SocketType type) {
 	int sockfd = 0;
-	if ((sockfd = socket(family, type, 0)) < 0) {
-		perror("Socket() error");
+	if ((sockfd = socket(family, static_cast<int>(type), 0)) < 0) {
+		std::cerr << "Socket() error" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 
@@ -60,7 +66,7 @@ int Server::Socket(int family, int type) {
  * Второй пар-р (INADDR_ANY) позволяет Серверу принимать соединения клиента
  * на любом интерфейсе
  */
-sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t port_number) {
+sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t portNumber) {
 	/**
 	 * Заполнение стр-ры адреса сокета Интернета
 	 * IP-адресом и № порта сервера
@@ -70,7 +76,7 @@ sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t p
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = family;	//	IPv4
 	servaddr.sin_addr.s_addr = htonl(hostlong);
-	servaddr.sin_port = htons(port_number);	//	приводит № порта к нужному формату
+	servaddr.sin_port = htons(portNumber);	//	приводит № порта к нужному формату
 
 	return servaddr;
 }
@@ -81,7 +87,7 @@ sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t p
  */
 void Server::Bind(int sockfd, const struct sockaddr_in& servaddr) {
 	if ((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) == -1) {
-		perror("SERVER Bind() failed");
+		std::cerr << "SERVER Bind() failed" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -92,9 +98,9 @@ void Server::Bind(int sockfd, const struct sockaddr_in& servaddr) {
  * Второй пар-р задает макс кол-во клиентских соед-ий, к-рые ядро
  * ставит в очередь на прослушиваемом сокете.
  */
-void Server::Listen(int sockfd, size_t listen_queue_size) {
-	if ((listen(sockfd, listen_queue_size) == -1)) {
-		perror("SERVER Listen() failed");
+void Server::Listen(int sockfd, size_t listenQueueSize) {
+	if ((listen(sockfd, listenQueueSize) == -1)) {
+		std::cerr << "SERVER Listen() failed" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -112,9 +118,9 @@ void Server::Listen(int sockfd, size_t listen_queue_size) {
  */
 int Server::Accept(struct sockaddr_in& client_addr) {
 	socklen_t size = sizeof(client_addr);
-	int client_fd = accept(listenFd, (struct sockaddr*)&client_addr, &size);
-	if (client_fd == -1 && errno != EINTR) {
-		perror("SERVER Accept() failed");
+	int clientFd = accept(m_listenFd, (struct sockaddr*)&client_addr, &size);
+	if (clientFd == -1 && errno != EINTR) {
+		std::cerr << "SERVER Accept() failed" << std::endl;
 		exit(EXIT_FAILURE);
 	}
 	//	Во время вып-я Accept пришел сигнал и прервал ее выполнение -> перезапускаем Accept
@@ -122,27 +128,27 @@ int Server::Accept(struct sockaddr_in& client_addr) {
 		return -1;
 	}
 
-	return client_fd;
+	return clientFd;
 }
 
 /**
  * Определение адреса и порта клиента
  */
-pair<string, uint16_t> Server::GetClientId(const struct sockaddr_in &client) {
-	pair <string, int> p;
+std::pair<std::string, uint16_t> Server::GetClientId(const struct sockaddr_in& client) {
+	std::pair<std::string, int> res;
 	char client_addr[INET_ADDRSTRLEN];	//	адрес клиента. То же самое, что и возвращаемое значение. Не исп-ся!
 	//	преобразуем 32-битовый адрес в строку
-	p.first = inet_ntop(client.sin_family, &client.sin_addr, client_addr, sizeof(client_addr));
-	p.second = ntohs(client.sin_port);	//	преобразование сетевого порядка байтов в порядок байт узла
+	res.first = inet_ntop(client.sin_family, &client.sin_addr, client_addr, sizeof(client_addr));
+	res.second = ntohs(client.sin_port);	//	преобразование сетевого порядка байтов в порядок байт узла
 
-	return p;
+	return res;
 }
 
 /**
  * Передача клиенту ответа от Сервера
  */
-void Write(int connfd, const string& write_string) {
-	write(connfd, write_string.c_str(), write_string.size());
+void Write(int connfd, const std::string& writeString) {
+	write(connfd, writeString.c_str(), writeString.size());
 }
 
 /**
@@ -192,7 +198,7 @@ ssize_t Server::readn(int fd, void *vptr, size_t n) {
 ssize_t Server::Readn(int listenFd, void *ptr, size_t nbytes) {
 	ssize_t	n;
 	if ((n = readn(listenFd, ptr, nbytes)) < 0) {
-		perror("readn error");
+		std::cerr << "readn error" << std::endl;
 	}
 
 	return(n);
@@ -225,14 +231,14 @@ ssize_t Server::writen(int fd, const void *vptr, size_t n) {
 
 void Server::Writen(int fd, const void *ptr, size_t nbytes) {
 	if (writen(fd, ptr, nbytes) != static_cast<int>(nbytes)) {
-		perror("writen error");
+		std::cerr << "writen error" << std::endl;
 	}
 }
 
 /**
  * Ф-я отправки эха-сообщения клиенту
  */
-void Server::str_echo(int clientfd) {
+void Server::StrEcho(int clientfd) {
 	char buf[128];
 	int n = Readn(clientfd, buf, sizeof(buf));
 	//cout << "Read: " << buf << endl;
@@ -252,7 +258,7 @@ void Server::SignalInit(int signo, void (*signal_handler)(int)) {
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(signo, &action, NULL) == -1) {
-        perror("sigaction");
+        std::cerr << "sigaction" << std::endl;
         exit(EXIT_FAILURE);
     }
 }
