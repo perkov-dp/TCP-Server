@@ -12,21 +12,12 @@
 #include <errno.h>
 #include <stdlib.h>		//	exit
 
-/**
- * Макс кол-во клиентских соед-ий, к-рые ядро
- * ставит в очередь на прослушиваемом сокете.
- */
-constexpr size_t LISTENQ = 1024;
-
-enum class SocketType {
-	SOCK_STREAM,
-	SOCK_DGRAM
-};
+#include "Socket.h"
 
 class Server {
 public:
-	Server(SocketType socketType, uint16_t portNumber);
-	virtual ~Server();
+	Server(Endpoint&& endpoint, SocketType socketType);
+	
 	int Accept(struct sockaddr_in& client_addr);
 	std::pair<std::string, uint16_t> GetClientId(const struct sockaddr_in& client);
 	void Close(int connfd);
@@ -41,14 +32,13 @@ public:
 
 	void SignalInit(int signo, void (*signal_handler)(int));
 private:
-	int Socket(int family, SocketType socketType);
-	sockaddr_in InitSockaddrStruct(int family, uint32_t hostlong, uint16_t portNumber);
-	void Bind(int sockfd, const struct sockaddr_in& servaddr);
-	void Listen(int sockfd, size_t listenQueueSize);
-
 	ssize_t readn(int fd, void *vptr, size_t n);
 	ssize_t writen(int fd, const void *vptr, size_t n);
 
 	int m_listenFd;
 	struct sockaddr_in m_servaddr;
+
+	Endpoint m_address;
+
+	Socket m_serverSocket;
 };

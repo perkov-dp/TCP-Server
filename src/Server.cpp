@@ -10,125 +10,13 @@
  * - bind
  * - listen
  */
-Server::Server(SocketType socketType, uint16_t portNumber) {
-	/**
-	 * Создание сокета 'SocketType'.
-	 * Ф-я Socket возвращает дискриптор, к-рый идентифицирует сокет
-	 * в последующих вызовах (connect, read)
-	 */
-	const int PROTOCOL_FAMILY = AF_INET;	//	семейство протоколов IPv4
-	m_listenFd = Socket(PROTOCOL_FAMILY, socketType);
-
-	/**
-	 * Связывание заранее известного порта сервера с сокетом
-	 */
-	constexpr uint32_t IP_ADDRESS = INADDR_ANY;	//	прием запроса с любого адреса
-	m_servaddr = InitSockaddrStruct(PROTOCOL_FAMILY, IP_ADDRESS, portNumber);
-	Bind(m_listenFd, m_servaddr);
-
-	/**
-	 * Преобразование сокета в прослушиваемый сокет, т.е. такой,
-	 * на к-ром ядро принимает входящие сообщ-я от клиентов.
-	 * Второй пар-р задает макс кол-во клиентских соед-ий, к-рые ядро
-	 * ставит в очередь на прослушиваемом сокете.
-	 */
-	Listen(m_listenFd, LISTENQ);
+Server::Server(Endpoint&& endpoint, SocketType socketType)
+	: m_serverSocket(Socket{std::move(endpoint), socketType})
+{
 }
 
-Server::~Server() {
-	Close(m_listenFd);
-}
-
-
-/**
- * Создание сокета. Сокетом часто называют два значения,
- * идентифицирующие конечную точку: IP-адрес и номер порта.
- *
- * Принимает на вход:
- * - семейство протоколов (AF_INET - интернета IPv4)
- * - type (SOCK_STREAM - потоковый сокет)
- * - protocol - обычно 0
- * Все вместе - это название TCP-сокета
- * Возвращает дескриптор сокета
- */
-int Server::Socket(int family, SocketType type) {
-	int sockfd = 0;
-	if ((sockfd = socket(family, static_cast<int>(type), 0)) < 0) {
-		std::cerr << "Socket() error" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-
-	return sockfd;
-}
-
-/**
- * Заполнение структуры адреса Интернета
- * Второй пар-р (INADDR_ANY) позволяет Серверу принимать соединения клиента
- * на любом интерфейсе
- */
-sockaddr_in Server::InitSockaddrStruct(int family, uint32_t hostlong, uint16_t portNumber) {
-	/**
-	 * Заполнение стр-ры адреса сокета Интернета
-	 * IP-адресом и № порта сервера
-	 * inet_pton - преобразовывает строковый IP-адрес в двоичный формат
-	 */
-	struct sockaddr_in servaddr;
-	bzero(&servaddr, sizeof(servaddr));
-	servaddr.sin_family = family;	//	IPv4
-	servaddr.sin_addr.s_addr = htonl(hostlong);
-	servaddr.sin_port = htons(portNumber);	//	приводит № порта к нужному формату
-
-	return servaddr;
-}
-
-/**
- * Связывание заранее сокет c IP-адресом.
- * Для вызова bind н/обладать правами суперпользователя!!!
- */
-void Server::Bind(int sockfd, const struct sockaddr_in& servaddr) {
-	if ((bind(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr))) == -1) {
-		std::cerr << "SERVER Bind() failed" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}
-
-/**
- * Преобразование сокета в прослушиваемый сокет, т.е. такой,
- * на к-ром ядро принимает входящие сообщ-я от клиентов.
- * Второй пар-р задает макс кол-во клиентских соед-ий, к-рые ядро
- * ставит в очередь на прослушиваемом сокете.
- */
-void Server::Listen(int sockfd, size_t listenQueueSize) {
-	if ((listen(sockfd, listenQueueSize) == -1)) {
-		std::cerr << "SERVER Listen() failed" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}
-
-
-/**
- * Прием клиентского соединения.
- * Процесс блокируется ф-ей Accept, ожидая принятия подключения клиента.
- * После установления соединения Accept возвращает значение нового дескриптора,
- * который называется присоединенным дескриптором.
- * Этот дескриптор исп-ся для связи с новым клиентом и возвращается для каждого клиента,
- * соединяющегося с нашим сервером.
- *
- * Аргументы servaddr и size исп-ся для идентификации клиента (адрес протокола клиента)
- */
 int Server::Accept(struct sockaddr_in& client_addr) {
-	socklen_t size = sizeof(client_addr);
-	int clientFd = accept(m_listenFd, (struct sockaddr*)&client_addr, &size);
-	if (clientFd == -1 && errno != EINTR) {
-		std::cerr << "SERVER Accept() failed" << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	//	Во время вып-я Accept пришел сигнал и прервал ее выполнение -> перезапускаем Accept
-	else if (errno == EINTR) {
-		return -1;
-	}
-
-	return clientFd;
+	return m_serverSocket.Accept(client_addr);
 }
 
 /**
@@ -145,17 +33,18 @@ std::pair<std::string, uint16_t> Server::GetClientId(const struct sockaddr_in& c
 }
 
 /**
- * Передача клиенту ответа от Сервера
- */
-void Write(int connfd, const std::string& writeString) {
-	write(connfd, writeString.c_str(), writeString.size());
-}
-
-/**
  * Завершение соединения с клиентом.
  */
 void Server::Close(int connfd) {
+	shutdown(connfd, SHUT_RDWR);	//	разрываем соединение с клиентом на чтение и запись
 	close(connfd);
+}
+
+/**
+ * Передача клиенту ответа от Сервера
+ */
+void Write(int connfd, const std::string& writeString) {
+	send(connfd, writeString.c_str(), writeString.size(), MSG_NOSIGNAL);
 }
 
 /**
@@ -171,7 +60,7 @@ ssize_t Server::readn(int fd, void *vptr, size_t n) {
 	ptr = (char*)vptr;
 	nleft = n;
 	while (nleft > 0) {
-		nread = read(fd, ptr, nleft);
+		nread = recv(fd, ptr, nleft, MSG_NOSIGNAL);
 		if (nread < 0) {
 			if (errno == EINTR) {
 				/* and call read() again */
@@ -198,7 +87,7 @@ ssize_t Server::readn(int fd, void *vptr, size_t n) {
 ssize_t Server::Readn(int listenFd, void *ptr, size_t nbytes) {
 	ssize_t	n;
 	if ((n = readn(listenFd, ptr, nbytes)) < 0) {
-		std::cerr << "readn error" << std::endl;
+		std::cerr << "readn error: " << strerror(errno) << std::endl;
 	}
 
 	return(n);
@@ -231,7 +120,7 @@ ssize_t Server::writen(int fd, const void *vptr, size_t n) {
 
 void Server::Writen(int fd, const void *ptr, size_t nbytes) {
 	if (writen(fd, ptr, nbytes) != static_cast<int>(nbytes)) {
-		std::cerr << "writen error" << std::endl;
+		std::cerr << "writen error: " << strerror(errno) << std::endl;
 	}
 }
 
@@ -258,7 +147,7 @@ void Server::SignalInit(int signo, void (*signal_handler)(int)) {
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(signo, &action, NULL) == -1) {
-        std::cerr << "sigaction" << std::endl;
+        std::cerr << "sigaction: " << strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
 }

@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 	constexpr uint16_t PORT_NUMBER = 34543;	//	сервер даты и времени
 	constexpr SocketType SOCKET_TYPE = SocketType::SOCK_STREAM;	//	потоковый сокет
 	
-	Server server(SOCKET_TYPE, PORT_NUMBER);
+	Server server({"127.0.0.1", PORT_NUMBER}, SOCKET_TYPE);
 	server.SignalInit(SIGCHLD, SigChild);
 
 	std::cout << "Server start work" << std::endl;
